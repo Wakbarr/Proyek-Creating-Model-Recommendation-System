@@ -253,6 +253,8 @@ di mana \( y_i \) adalah rating sebenarnya dan \( \hat{y}_i \) adalah rating yan
 Model Collaborative Filtering dievaluasi menggunakan RMSE pada data pelatihan dan validasi berdasarkan kode pelatihan model di notebook.  
 *Grafik RMSE*:
 
+![image](https://github.com/user-attachments/assets/702d54db-f478-4cb9-82a3-09447c24291c)
+
 Visualisasi RMSE dihasilkan dari kode berikut:
 ```python
 plt.plot(history.history['root_mean_squared_error'], label='Train RMSE')
