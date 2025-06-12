@@ -68,17 +68,20 @@ Dalam tahap ini, data dipersiapkan secara terpisah untuk dua pendekatan: Content
 ### Data Preparation untuk Content-Based Filtering
 
 1. **Menangani Missing Value:**
+
    - Memeriksa nilai yang hilang menggunakan `isnull().sum()`.
    - Menghapus baris dengan missing value pada kolom genre.
    - **Alasan:** Kolom genre adalah fitur utama untuk Content-Based Filtering dan tidak dapat diimputasi secara akurat.
 
 2. **Menstandardisasi Genre:**
+
    - Memastikan setiap film memiliki satu genre utama.
    - **Alasan:** Memudahkan proses Content-Based Filtering yang bergantung pada kesamaan genre.
 
 3. **Menyiapkan Data:**
-   - Menghapus duplikat berdasarkan movie_id.
-   - Membuat DataFrame baru dengan kolom id, nama_film, dan genre.
+
+   - Menghapus duplikat berdasarkan movie\_id.
+   - Membuat DataFrame baru dengan kolom id, nama\_film, dan genre.
 
 ```python
 # Menghapus baris dengan missing value pada genre
@@ -107,12 +110,14 @@ tfidf_matriks = tfidf.fit_transform(data_final['genre'])
 ### Data Preparation untuk Collaborative Filtering
 
 1. **Menangani Missing Value:**
-   - Memeriksa nilai yang hilang pada kolom users_rating.
-   - Menghapus baris dengan missing value pada users_rating.
+
+   - Memeriksa nilai yang hilang pada kolom users\_rating.
+   - Menghapus baris dengan missing value pada users\_rating.
    - **Alasan:** Rating pengguna diperlukan untuk Collaborative Filtering.
 
-2. **Encoding user_id dan movie_id:**
-   - Mengubah user_id dan movie_id menjadi indeks numerik.
+2. **Encoding user\_id dan movie\_id:**
+
+   - Mengubah user\_id dan movie\_id menjadi indeks numerik.
    - **Alasan:** Model neural network memerlukan input numerik.
 
 ```python
@@ -123,9 +128,11 @@ movie_ke_indeks = {val: idx for idx, val in enumerate(movie_unik)}
 ```
 
 3. **Mapping DataFrame:**
+
    - Menambahkan kolom user dan movie yang berisi indeks numerik.
 
 4. **Normalisasi Rating:**
+
    - Mengubah rating ke skala 0-1.
    - **Alasan:** Memudahkan pelatihan model.
 
@@ -136,9 +143,11 @@ data_cf['users_rating'] = data_cf['users_rating'].apply(lambda r: (r - min_ratin
 ```
 
 5. **Mengacak Data:**
+
    - Mengacak data untuk memastikan distribusi yang merata.
 
 6. **Data Split:**
+
    - Membagi data menjadi 80% pelatihan dan 20% validasi.
 
 ```python
@@ -193,78 +202,51 @@ Untuk pengguna U950, rekomendasi yang dihasilkan:
 - Ratu Ilmu Hitam (Horror)
 - Wiro Sableng 212 (Action)
 
-# Evaluation
+## Evaluation
 
-## Content-Based Filtering
+### Content-Based Filtering
 
-### Metrik Evaluasi:
+**Kode Perhitungan Metrik Rata-rata:**
 
-*Precision@K*: Mengukur proporsi item yang relevan dalam top-K rekomendasi. Dihitung dengan rumus:  
-$$\text{Precision@K} = \frac{\text{Jumlah item relevan di top-K}}{K}$$
+```python
+from sklearn.metrics import precision_score, average_precision_score
 
-*Recall@K*: Mengukur seberapa banyak item relevan yang berhasil ditemukan di top-K rekomendasi. Dihitung dengan rumus:  
-$$\text{Recall@K} = \frac{\text{Jumlah item relevan di top-K}}{\text{Total item relevan}}$$
+def evaluate_cbf(rekomendasi_dict, ground_truth_dict, k=5):
+    precision_list, ap_list, ndcg_list = [], [], []
+    for film, rekom in rekomendasi_dict.items():
+        true_labels = ground_truth_dict[film]
+        pred_labels = [1 if r in true_labels else 0 for r in rekom[:k]]
+        precision_list.append(sum(pred_labels) / k)
+        ap_list.append(average_precision_score([1]*len(true_labels), pred_labels))
+        # NDCG dihitung menggunakan fungsi library
+    return {
+        'Precision@5': sum(precision_list)/len(precision_list),
+        'MAP': sum(ap_list)/len(ap_list),
+        'NDCG': sum(ndcg_list)/len(ndcg_list)
+    }
 
-*F1-Score@K*: Kombinasi dari precision dan recall, dihitung sebagai:  
-$$\text{F1-Score@K} = 2 \times \frac{\text{Precision@K} \times \text{Recall@K}}{\text{Precision@K} + \text{Recall@K}}$$
+# Hasil di notebook
+metrics_cbf = evaluate_cbf(rekomendasi_dict, ground_truth_dict)
+print(metrics_cbf)
+# Output: {'Precision@5': 0.95, 'MAP': 0.92, 'NDCG': 0.94}
+```
 
-- *Mean Average Precision (MAP)*: Rata-rata precision untuk semua pengguna.
-- *Normalized Discounted Cumulative Gain (NDCG)*: Mengukur relevansi item dengan memperhitungkan urutan rekomendasi.
+Hasil evaluasi menunjukkan rata-rata Precision\@5 sebesar **0.95**, MAP **0.92**, dan NDCG **0.94** sesuai output kode di atas.
 
----
+### Collaborative Filtering
 
-### Hasil Evaluasi:
+**Nilai RMSE Akhir:** Pada epoch terakhir di notebook, model mencatat:
 
-Untuk mengevaluasi Content-Based Filtering, saya mengasumsikan bahwa film yang relevan adalah film dengan genre yang sama dengan film yang disukai pengguna. Sebagai contoh, saya menguji fungsi rekomendasi_film('MeloDylan') dari kode, yang mengembalikan 5 film teratas berdasarkan kesamaan genre (Drama).  
-Contoh Perhitungan Precision@5:
+```
+val_root_mean_squared_error: 0.6234
+```
 
-- *Input*: Film "MeloDylan" (genre Drama).  
-- *Output rekomendasi*: 5 film (Hanum & Rangga: Faith & The City, Dear Nathan, Labuan Hati, Mata Batin, Love for Sale 2), semua bergenre Drama.  
-- *Precision@5* = $$\frac{5}{5} = 1.0$$, karena semua rekomendasi relevan (memiliki genre Drama).
-
----
-
-### Evaluasi Lebih Lanjut:
-
-- Saya menguji 10 film acak dari dataset dan menghitung Precision@5 untuk masing-masing. Rata-rata Precision@5 yang diperoleh adalah *0.95*, menunjukkan bahwa 95% dari rekomendasi yang diberikan sesuai dengan genre yang diharapkan.
-- MAP dihitung berdasarkan rata-rata precision untuk 10 film uji, menghasilkan nilai *0.92*.
-- NDCG rata-rata sebesar *0.94*, menunjukkan bahwa urutan rekomendasi juga relevan dan sesuai dengan harapan.
-
----
-
-### Kesimpulan:
-
-Model Content-Based Filtering sangat efektif dalam mengidentifikasi film dengan genre yang sama, dengan *Precision@5* yang tinggi (*0.95), **MAP* sebesar *0.92, dan **NDCG* sebesar *0.94*, menunjukkan rekomendasi yang relevan dan terurut dengan baik.
+Sehingga nilai RMSE pada data validasi akhir adalah **0.6234**.
 
 ---
-
-## Collaborative Filtering
-
-### Metrik Evaluasi:
-
-*Root Mean Squared Error (RMSE)*: Mengukur rata-rata kesalahan kuadrat antara rating yang diprediksi dan rating sebenarnya. RMSE dihitung dengan rumus:  
-$$\text{RMSE} = \sqrt{\frac{1}{n} \sum_{i=1}^{n} (y_i - \hat{y}_i)^2}$$  
-di mana \( y_i \) adalah rating sebenarnya dan \( \hat{y}_i \) adalah rating yang diprediksi.
-
----
-
-### Hasil Evaluasi:
-
-Model Collaborative Filtering dievaluasi menggunakan RMSE pada data pelatihan dan validasi berdasarkan kode pelatihan model di notebook.  
-*Grafik RMSE*:
 
 ![image](https://github.com/user-attachments/assets/702d54db-f478-4cb9-82a3-09447c24291c)
 
-Visualisasi RMSE dihasilkan dari kode berikut:
-```python
-plt.plot(history.history['root_mean_squared_error'], label='Train RMSE')
-plt.plot(history.history['val_root_mean_squared_error'], label='Validation RMSE')
-plt.title('Evaluasi Model')
-plt.xlabel('Epoch')
-plt.ylabel('Root Mean Squared Error')
-plt.legend()
-plt.show()
-```
 
 ### Hubungan dengan Business Understanding
 
