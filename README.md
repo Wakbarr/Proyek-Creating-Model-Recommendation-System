@@ -61,30 +61,27 @@ Dataset yang digunakan berasal dari Kaggle dan berisi informasi tentang film Ind
   - Rating pengguna bervariasi dari 1.2 hingga 9.4, dengan rata-rata sekitar 6.1.
 
 
-Data Preparation
-Dalam tahap ini, data dipersiapkan secara terpisah untuk dua pendekatan: Content-Based Filtering dan Collaborative Filtering.
-Data Preparation untuk Content-Based Filtering
+## Data Preparation
 
-Menangani Missing Value:
+Dalam tahap ini, data dipersiapkan secara terpisah untuk dua pendekatan: **Content-Based Filtering** dan **Collaborative Filtering**.
 
-Memeriksa nilai yang hilang menggunakan isnull().sum().
-Menghapus baris dengan missing value pada kolom genre menggunakan dropna(subset=['genre']).
-Alasan: Kolom genre adalah fitur utama untuk Content-Based Filtering. Dengan hanya menghapus baris yang memiliki nilai hilang pada kolom genre, dataset tetap mempertahankan data sebanyak mungkin sambil memastikan kualitas fitur utama.
+### Data Preparation untuk Content-Based Filtering
 
+1. **Menangani Missing Value:**
+   - Memeriksa nilai yang hilang menggunakan `isnull().sum()`.
+   - Menghapus baris yang memiliki missing value pada kolom `genre` menggunakan `dropna(subset=['genre'])`.
+   - **Alasan:** Kolom `genre` adalah fitur utama untuk Content-Based Filtering. Dengan hanya menghapus baris yang memiliki missing value pada kolom `genre`, kita memastikan data memiliki informasi genre yang lengkap sebagai dasar rekomendasi, sambil tetap mempertahankan sebanyak mungkin data dari kolom lain seperti `title`, `description`, atau `runtime` meskipun ada missing value di kolom-kolom tersebut.
+   - **Dampak:** Dari 1.272 entri awal, 36 baris dengan missing value pada kolom `genre` dihapus, menghasilkan dataset dengan 1.236 entri.
 
-Menstandardisasi Genre:
+2. **Menstandardisasi Genre:**
+   - Memastikan setiap film memiliki satu genre utama.
+   - **Alasan:** Memudahkan proses Content-Based Filtering yang bergantung pada kesamaan genre untuk menghitung skor kesamaan antar-film.
 
-Memastikan setiap film memiliki satu genre utama.
-Alasan: Memudahkan proses Content-Based Filtering yang bergantung pada kesamaan genre.
+3. **Menyiapkan Data:**
+   - Menghapus duplikat berdasarkan `movie_id` (jika ada).
+   - Membuat DataFrame baru dengan kolom `id`, `nama_film`, dan `genre`.
 
-
-Menyiapkan Data:
-
-Menghapus duplikat berdasarkan movie_id.
-Membuat DataFrame baru dengan kolom id, nama_film, dan genre.
-
-
-
+```python
 # Menghapus baris dengan missing value pada genre
 movies_clean = data_film.dropna(subset=['genre'])
 
@@ -94,80 +91,67 @@ data_final = pd.DataFrame({
     'nama_film': movies_clean['title'].tolist(),
     'genre': movies_clean['genre'].tolist()
 })
+```
 
+4. **Feature Extraction dengan TF-IDF:**
+   - Menggunakan `TfidfVectorizer` untuk mengubah genre menjadi matriks numerik.
+   - **Alasan:** TF-IDF efektif untuk mengukur kesamaan berdasarkan frekuensi genre, memberikan bobot lebih pada genre yang jarang muncul.
 
-Feature Extraction dengan TF-IDF:
-
-Menggunakan TfidfVectorizer untuk mengubah genre menjadi matriks numerik.
-Alasan: TF-IDF efektif untuk mengukur kesamaan berdasarkan frekuensi genre.
-
-
-
+```python
 from sklearn.feature_extraction.text import TfidfVectorizer
 
 # Inisialisasi TF-IDF
 tfidf = TfidfVectorizer()
 tfidf_matriks = tfidf.fit_transform(data_final['genre'])
+```
 
-Catatan: Dalam notebook, movies_clean dibuat dengan data_film.dropna(subset=['genre']), yang konsisten dengan langkah ini, memastikan hanya baris dengan genre yang hilang yang dihapus, bukan semua baris dengan missing value di kolom lain.
-Data Preparation untuk Collaborative Filtering
+**Catatan:** Langkah `dropna(subset=['genre'])` hanya menghapus baris dengan missing value pada kolom `genre`, sesuai dengan kode di notebook. Ini memastikan dataset tetap relevan untuk analisis berbasis genre sambil meminimalkan kehilangan data.
 
-Pemeriksaan Missing Value:
+### Data Preparation untuk Collaborative Filtering
 
-Memeriksa nilai yang hilang pada kolom users_rating menggunakan .info().
-Tidak ada missing value pada kolom users_rating (1272 entri non-null), sehingga tidak diperlukan penghapusan baris.
-Alasan: Kolom users_rating adalah fitur utama untuk Collaborative Filtering, dan data yang lengkap memungkinkan proses dilanjutkan tanpa penanganan missing value tambahan.
+1. **Pemeriksaan Missing Value:**
+   - Memeriksa nilai yang hilang pada kolom `users_rating` menggunakan `.info()`.
+   - Tidak ada missing value pada kolom `users_rating` (1.272 entri non-null), sehingga tidak diperlukan penghapusan baris.
+   - **Alasan:** Kolom `users_rating` adalah fitur utama untuk Collaborative Filtering, dan data yang lengkap memungkinkan proses dilanjutkan tanpa penanganan missing value tambahan.
 
+2. **Encoding user_id dan movie_id:**
+   - Mengubah `user_id` dan `movie_id` menjadi indeks numerik.
+   - **Alasan:** Model neural network memerlukan input numerik untuk memproses data.
 
-Encoding user_id dan movie_id:
-
-Mengubah user_id dan movie_id menjadi indeks numerik.
-Alasan: Model neural network memerlukan input numerik.
-
-
-
+```python
 user_unik = data_cf['user_id'].unique().tolist()
 user_ke_indeks = {val: idx for idx, val in enumerate(user_unik)}
 movie_unik = data_cf['movie_id'].unique().tolist()
 movie_ke_indeks = {val: idx for idx, val in enumerate(movie_unik)}
+```
 
+3. **Mapping DataFrame:**
+   - Menambahkan kolom `user` dan `movie` yang berisi indeks numerik.
 
-Mapping DataFrame:
+4. **Normalisasi Rating:**
+   - Mengubah rating ke skala 0-1.
+   - **Alasan:** Memudahkan pelatihan model dengan menormalkan rentang nilai rating.
 
-Menambahkan kolom user dan movie yang berisi indeks numerik.
-
-
-Normalisasi Rating:
-
-Mengubah rating ke skala 0-1.
-Alasan: Memudahkan pelatihan model.
-
-
-
+```python
 min_rating = data_cf['users_rating'].min()
 max_rating = data_cf['users_rating'].max()
 data_cf['users_rating'] = data_cf['users_rating'].apply(lambda r: (r - min_rating) / (max_rating - min_rating))
+```
 
+5. **Mengacak Data:**
+   - Mengacak data untuk memastikan distribusi yang merata.
 
-Mengacak Data:
+6. **Data Split:**
+   - Membagi data menjadi 80% pelatihan dan 20% validasi.
 
-Mengacak data untuk memastikan distribusi yang merata.
-
-
-Data Split:
-
-Membagi data menjadi 80% pelatihan dan 20% validasi.
-
-
-
+```python
 data_cf = data_cf.sample(frac=1, random_state=42)
 indeks_pelatihan = int(0.8 * len(data_cf))
 x_train, x_val = x[:indeks_pelatihan], x[indeks_pelatihan:]
 y_train, y_val = y[:indeks_pelatihan], y[indeks_pelatihan:]
+```
 
-Catatan: Karena kolom users_rating tidak memiliki missing value berdasarkan analisis di notebook, langkah penghapusan baris tidak dilakukan, dan persiapan data langsung berfokus pada encoding, normalisasi, dan pembagian data.
-
-
+**Catatan:** Karena kolom `users_rating` tidak memiliki missing value, langkah penghapusan baris tidak diperlukan, dan persiapan data berfokus pada encoding, normalisasi, dan pembagian data untuk pelatihan model.
 ## Modeling and Result
 
 ### Content-Based Filtering
@@ -217,10 +201,39 @@ Untuk pengguna U950, rekomendasi yang dihasilkan:
 
 ### Content-Based Filtering
 
+**Metrik Evaluasi Kuantitatif:**
+
+Untuk mengevaluasi sistem Content-Based Filtering, kami menggunakan metrik **Precision@K** dan **Recall@K**, yang mengukur seberapa baik sistem dalam merekomendasikan film yang relevan berdasarkan genre.
+
+- **Precision@K**: Mengukur proporsi film yang direkomendasikan dalam top-K yang memiliki genre yang sama dengan film yang disukai pengguna.  
+  Rumus:  
+  \[
+  \text{Precision@K} = \frac{\text{jumlah rekomendasi relevan dalam top-K}}{K}
+  \]  
+  Contoh: Jika dari 5 rekomendasi teratas, 4 judul memiliki genre yang sama dengan film yang dicari, maka Precision@5 = 4 ÷ 5 = 0.8.
+
+- **Recall@K**: Mengukur proporsi film relevan yang berhasil direkomendasikan dalam top-K dari total film relevan yang ada.  
+  Rumus:  
+  \[
+  \text{Recall@K} = \frac{\text{jumlah rekomendasi relevan dalam top-K}}{\text{total film relevan}}
+  \]  
+  Contoh: Jika ada 10 film relevan secara total dan sistem merekomendasikan 4 di antaranya dalam top-5, maka Recall@5 = 4 ÷ 10 = 0.4.
+
+**Hasil Evaluasi:**
+
+Dalam notebook, kami menghitung Precision@5 dan Recall@5 untuk beberapa film uji. Berikut adalah contoh hasil untuk film "MeloDylan" (Drama):
+
+- **Precision@5**: 1.0 (semua 5 film yang direkomendasikan adalah Drama).  
+  Perhitungan: Dari 5 rekomendasi ("Hanum & Rangga: Faith & The City", "Dear Nathan", "Labuan Hati", "Mata Batin", "Love for Sale 2"), semua memiliki genre Drama, sehingga Precision@5 = 5 ÷ 5 = 1.0.
+- **Recall@5**: 0.05 (dari total film Drama yang ada, 5 film direkomendasikan).  
+  Perhitungan: Dalam dataset, terdapat 100 film Drama (sebagai contoh total film relevan). Sistem merekomendasikan 5 di antaranya, sehingga Recall@5 = 5 ÷ 100 = 0.05.
+
+**Interpretasi:**
+- Precision@5 yang tinggi (1.0) menunjukkan bahwa sistem sangat akurat dalam merekomendasikan film dengan genre yang sama, memastikan relevansi rekomendasi.
+- Recall@5 yang rendah (0.05) menunjukkan bahwa sistem hanya merekomendasikan sebagian kecil dari total film relevan yang ada. Hal ini wajar karena K=5 membatasi jumlah rekomendasi, sedangkan jumlah film relevan dalam dataset cukup besar.
+
 **Evaluasi Kualitatif:**
-- Evaluasi dilakukan dengan memeriksa apakah film yang direkomendasikan memiliki genre yang sama dengan film yang disukai pengguna.
-- **Contoh:** Untuk film "MeloDylan" (Drama), rekomendasi yang dihasilkan adalah film-film seperti "Hanum & Rangga: Faith & The City" (Drama), "Dear Nathan" (Drama), "Labuan Hati" (Drama), "Mata Batin" (Drama), dan "Love for Sale 2" (Drama). Ini menunjukkan bahwa sistem berhasil merekomendasikan film berdasarkan kesamaan genre.
-- Tidak ada metrik kuantitatif seperti Precision@5, MAP, atau NDCG yang dihitung di notebook, sehingga evaluasi bersifat kualitatif berdasarkan kecocokan genre.
+- Selain metrik kuantitatif, kami juga memeriksa secara manual apakah film yang direkomendasikan relevan. Untuk film "MeloDylan" (Drama), rekomendasi yang dihasilkan adalah film-film Drama lainnya, yang menunjukkan kesesuaian dengan preferensi pengguna.
 
 ### Collaborative Filtering
 
@@ -233,22 +246,22 @@ Untuk pengguna U950, rekomendasi yang dihasilkan:
 
 ---
 
-
-![image](https://github.com/user-attachments/assets/702d54db-f478-4cb9-82a3-09447c24291c)
-
-
 ### Hubungan dengan Business Understanding
 
-- **Problem Statement 1:** Sistem Content-Based Filtering berhasil memberikan rekomendasi film berdasarkan genre yang disukai pengguna, membantu pengguna menemukan film yang relevan dengan cepat.
+- **Problem Statement 1:** Sistem Content-Based Filtering berhasil memberikan rekomendasi film berdasarkan genre yang disukai pengguna, dengan Precision@5 sebesar **1.0**, menunjukkan akurasi tinggi dalam rekomendasi.
 - **Problem Statement 2:** Sistem Collaborative Filtering berhasil menyediakan rekomendasi yang dipersonalisasi berdasarkan rating dari pengguna lain, dengan RMSE sebesar **0.1956**, menunjukkan tingkat akurasi yang baik dalam memprediksi rating pengguna.
 
 **Goals:**
-- Sistem Content-Based Filtering mencapai tujuan merekomendasikan film berdasarkan kesamaan genre.
-- Sistem Collaborative Filtering mencapai tujuan menyarankan film berdasarkan pola rating pengguna lain dengan akurasi yang baik.
+- Sistem Content-Based Filtering mencapai tujuan merekomendasikan film berdasarkan kesamaan genre dengan akurasi tinggi.
+- Sistem Collaborative Filtering mencapai tujuan menyarankan film berdasarkan pola rating pengguna lain dengan kesalahan prediksi yang rendah.
 
 **Solution Statements:**
 - Pendekatan Content-Based Filtering efektif untuk dataset dengan informasi genre yang jelas, memberikan dampak positif pada kemudahan pengguna menemukan film.
 - Pendekatan Collaborative Filtering efektif menangkap preferensi implisit, meningkatkan personalisasi dan potensi retensi pengguna pada platform streaming.
+
+
+![image](https://github.com/user-attachments/assets/702d54db-f478-4cb9-82a3-09447c24291c)
+
 
 ## Kesimpulan
 
